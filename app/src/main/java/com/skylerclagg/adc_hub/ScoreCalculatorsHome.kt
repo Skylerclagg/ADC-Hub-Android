@@ -30,6 +30,10 @@ import com.skylerclagg.adc_hub.destinations.AutonomousFlightSkillsCalculatorDest
 import com.skylerclagg.adc_hub.destinations.PilotingSkillsCalculatorDestination
 import com.skylerclagg.adc_hub.destinations.TeamworkScoreCalculatorDestination
 
+
+
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Destination
 fun ScoreCalculatorsHome(navController: NavController) {
@@ -64,8 +68,8 @@ fun ScoreCalculatorsHome(navController: NavController) {
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Green,   // Set button background color to green
-                    contentColor = Color.White     // Set button text color to white
+                    containerColor = CustomGreen,   // Changed to custom green
+                    contentColor = Color.White      // Keep white text
                 )
             ) {
                 Text("Teamwork Score Calculator")
@@ -80,8 +84,8 @@ fun ScoreCalculatorsHome(navController: NavController) {
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Blue,   // Set button background color to blue
-                    contentColor = Color.White     // Set button text color to white
+                    containerColor = CustomGreen, // Changed to custom green
+                    contentColor = Color.White
                 )
             ) {
                 Text("Autonomous Flight Skills Calculator")
@@ -96,8 +100,8 @@ fun ScoreCalculatorsHome(navController: NavController) {
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,   // Set button background color to red
-                    contentColor = Color.White     // Set button text color to white
+                    containerColor = CustomGreen, // Changed to custom green
+                    contentColor = Color.White
                 )
             ) {
                 Text("Piloting Skills Calculator")

@@ -349,7 +349,7 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                 textStyle = LocalTextStyle.current.copy(
                     textAlign = TextAlign.Center,
                     fontSize = 34.sp,
-                    color = if (lookupViewModel.number.value.isEmpty() || lookupViewModel.number.value == "12345aV\u200B") Color.Gray else MaterialTheme.colorScheme.onSurface
+                    color = if (lookupViewModel.number.value.isEmpty() || lookupViewModel.number.value == "12345a\u200B") Color.Gray else MaterialTheme.colorScheme.onSurface
                 ),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,

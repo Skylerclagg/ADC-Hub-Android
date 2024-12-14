@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.ramcosta.composedestinations.annotation.Destination
+import com.skylerclagg.adc_hub.helperviews.SegmentText
+import com.skylerclagg.adc_hub.helperviews.SegmentedControl
 import com.skylerclagg.adc_hub.ui.theme.button
 import com.skylerclagg.adc_hub.ui.theme.onTopContainer
 import com.skylerclagg.adc_hub.ui.theme.topContainer
@@ -69,18 +71,18 @@ fun WorldSkillsView(navController: NavController) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
 
-    // filters
+    // Filters
     var isFilteredByFavorites by remember { mutableStateOf(false) }
     var filteredLetter by remember { mutableStateOf(' ') }
     var filteredRegion by remember { mutableStateOf(0) }
 
-    // get favorite teams
+    // Get favorite teams
     val favoriteTeams = remember {
         UserSettings(context).getData("favoriteTeams", "").replace("[", "").replace("]", "")
             .split(", ")
     }
 
-    // clear filters
+    // Clear filters
     fun clearFilters() {
         isFilteredByFavorites = false
         filteredLetter = ' '
@@ -88,7 +90,7 @@ fun WorldSkillsView(navController: NavController) {
         viewTitle = "World Skills"
     }
 
-    // filter by favorites
+    // Filter by favorites
     fun filterByFavorites() {
         isFilteredByFavorites = true
         filteredRegion = 0
@@ -96,7 +98,7 @@ fun WorldSkillsView(navController: NavController) {
         viewTitle = "Favorites Skills"
     }
 
-    // filter by letter
+    // Filter by letter
     fun filterByLetter(letter: Char) {
         filteredLetter = letter
         filteredRegion = 0
@@ -104,7 +106,7 @@ fun WorldSkillsView(navController: NavController) {
         viewTitle = "$letter Skills"
     }
 
-    // filter by region
+    // Filter by region
     fun filterByRegion(region: Int, regionName: String) {
         filteredRegion = region
         isFilteredByFavorites = false
@@ -125,7 +127,7 @@ fun WorldSkillsView(navController: NavController) {
                     Text(text = viewTitle, fontWeight = FontWeight.Bold)
                 },
                 actions = {
-                    // link to world skills
+                    // Link to World Skills
                     IconButton(
                         onClick = {
                             uriHandler.openUri("https://www.robotevents.com/robot-competitions/vex-robotics-competition/standings/skills")
@@ -230,7 +232,7 @@ fun WorldSkillsView(navController: NavController) {
                 DropdownMenuItem(
                     text = { Text("Letter") },
                     children = {
-                        // make a list of all the letters
+                        // Make a list of all the letters
                         for (letter in 'A'..'Z') {
                             HorizontalDivider(
                                 color = Color.Gray.copy(alpha = 0.1f),
@@ -265,175 +267,161 @@ fun WorldSkillsView(navController: NavController) {
             }
         }
 
-
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // Selector for Middle School or High School
-            Row(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+
+            // Middle School/High School Segmented Control
+            SegmentedControl(
+                listOf("Middle School", "High School"),
+                selectedGradeLevel,
+                onSegmentSelected = { selectedGradeLevel = it },
+                modifier = Modifier.padding(10.dp)
             ) {
-                Text(
-                    "Middle School",
-                    modifier = Modifier
-                        .clickable { selectedGradeLevel = "Middle School" }
-                        .padding(horizontal = 8.dp),
-                    color = if (selectedGradeLevel == "Middle School") Color.Blue else Color.Gray
-                )
-
-                Text(
-                    "High School",
-                    modifier = Modifier
-                        .clickable { selectedGradeLevel = "High School" }
-                        .padding(horizontal = 8.dp),
-                    color = if (selectedGradeLevel == "High School") Color.Blue else Color.Gray
-                )
+                SegmentText(text = it)
             }
-
-            if (importing) {
-                ImportingDataView()
-            } else {
-                val displayedCache = if (selectedGradeLevel == "Middle School") {
-                    API.middleSchoolWorldSkillsCache
+                if (importing) {
+                    ImportingDataView()
                 } else {
-                    API.highSchoolWorldSkillsCache
-                }
+                    val displayedCache = if (selectedGradeLevel == "Middle School") {
+                        API.middleSchoolWorldSkillsCache
+                    } else {
+                        API.highSchoolWorldSkillsCache
+                    }
 
-                // For debugging
-                println("Displayed Cache Size ($selectedGradeLevel): ${displayedCache.size}")
+                    // For debugging
+                    println("Displayed Cache Size ($selectedGradeLevel): ${displayedCache.size}")
 
-                if (displayedCache.isEmpty()) {
-                    NoDataView()
-                } else {
-                    Card(
-                        modifier = Modifier.padding(10.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(0.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp)
+                    if (displayedCache.isEmpty()) {
+                        NoDataView()
+                    } else {
+                        Card(
+                            modifier = Modifier.padding(10.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
                         ) {
-                            val filteredList = when {
-                                isFilteredByFavorites -> displayedCache.filter { it.team.number in favoriteTeams }
-                                filteredLetter != ' ' -> displayedCache.filter { it.team.number.last() == filteredLetter }
-                                filteredRegion != 0 -> displayedCache.filter { it.team.eventRegionId == filteredRegion }
-                                else -> displayedCache
-                            }
-
-                            // For debugging
-                            println("Filtered List Size: ${filteredList.size}")
-
-                            if (filteredList.isEmpty()) {
-                                item {
-                                    Text(
-                                        "No teams found!",
-                                        fontSize = 18.sp,
-                                        modifier = Modifier
-                                            .padding(10.dp)
-                                            .fillMaxSize()
-                                            .wrapContentSize(align = Alignment.Center)
-                                    )
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(0.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp)
+                            ) {
+                                val filteredList = when {
+                                    isFilteredByFavorites -> displayedCache.filter { it.team.number in favoriteTeams }
+                                    filteredLetter != ' ' -> displayedCache.filter { it.team.number.last() == filteredLetter }
+                                    filteredRegion != 0 -> displayedCache.filter { it.team.eventRegionId == filteredRegion }
+                                    else -> displayedCache
                                 }
-                            } else {
-                                itemsIndexed(filteredList) { index, wsEntry ->
 
-                                    var expanded by remember { mutableStateOf(false) }
+                                // For debugging
+                                println("Filtered List Size: ${filteredList.size}")
 
-                                    // Determine if a filter is applied
-                                    val filterApplied = isFilteredByFavorites || filteredLetter != ' ' || filteredRegion != 0
+                                if (filteredList.isEmpty()) {
+                                    item {
+                                        Text(
+                                            "No teams found!",
+                                            fontSize = 18.sp,
+                                            modifier = Modifier
+                                                .padding(10.dp)
+                                                .fillMaxSize()
+                                                .wrapContentSize(align = Alignment.Center)
+                                        )
+                                    }
+                                } else {
+                                    itemsIndexed(filteredList) { index, wsEntry ->
 
-                                    Row(
-                                        horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier
-                                            .padding(horizontal = 0.dp)
-                                            .fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(vertical = 7.dp)
+                                        var expanded by remember { mutableStateOf(false) }
+
+                                        // Determine if a filter is applied
+                                        val filterApplied = isFilteredByFavorites || filteredLetter != ' ' || filteredRegion != 0
+
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier
+                                                .padding(horizontal = 0.dp)
+                                                .fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                "#" + (index + 1),
-                                                fontSize = 18.sp,
-                                                modifier = Modifier.width(130.dp)
-                                            )
-                                            if (filterApplied) {
+                                            Column(
+                                                modifier = Modifier.padding(vertical = 7.dp)
+                                            ) {
                                                 Text(
-                                                    "(#" + wsEntry.rank.toString() + ")",
+                                                    "#" + (index + 1),
                                                     fontSize = 18.sp,
                                                     modifier = Modifier.width(130.dp)
                                                 )
+                                                if (filterApplied) {
+                                                    Text(
+                                                        "(#" + wsEntry.rank.toString() + ")",
+                                                        fontSize = 18.sp,
+                                                        modifier = Modifier.width(130.dp)
+                                                    )
+                                                }
                                             }
-                                        }
-                                        Spacer(modifier = Modifier.weight(1.0f))
-                                        Text(wsEntry.team.number, fontSize = 18.sp)
-                                        Spacer(modifier = Modifier.weight(1.0f))
-                                        Row(
-                                            modifier = Modifier.width(130.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
                                             Spacer(modifier = Modifier.weight(1.0f))
-                                            Text(
-                                                wsEntry.scores.score.toString(),
-                                                fontSize = 18.sp,
-                                                color = MaterialTheme.colorScheme.button,
-                                                modifier = Modifier.clickable {
-                                                    expanded = !expanded
-                                                })
-                                            DropdownMenu(
-                                                expanded = expanded,
-                                                onDismissRequest = { expanded = false }
+                                            Text(wsEntry.team.number, fontSize = 18.sp)
+                                            Spacer(modifier = Modifier.weight(1.0f))
+                                            Row(
+                                                modifier = Modifier.width(130.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                val DisabledAlpha = 0.38f
-                                                val disabledItemColors = MenuDefaults.itemColors(
-                                                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha),
-                                                    leadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha),
-                                                    trailingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("${wsEntry.scores.score} Combined") },
-                                                    onClick = { },
-                                                    enabled = false,
-                                                    colors = disabledItemColors
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("${wsEntry.scores.programming} Autonomous Flight") },
-                                                    onClick = { },
-                                                    enabled = false,
-                                                    colors = disabledItemColors
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("${wsEntry.scores.driver} Piloting") },
-                                                    onClick = { },
-                                                    enabled = false,
-                                                    colors = disabledItemColors
-                                                )
-
-                                            }
-                                            Spacer(modifier = Modifier.padding(horizontal = 5.dp))
-                                            Column {
+                                                Spacer(modifier = Modifier.weight(1.0f))
                                                 Text(
-                                                    wsEntry.scores.programming.toString(),
-                                                    fontSize = 12.sp
-                                                )
-                                                Text(wsEntry.scores.driver.toString(), fontSize = 12.sp)
+                                                    wsEntry.scores.score.toString(),
+                                                    fontSize = 18.sp,
+                                                    color = MaterialTheme.colorScheme.button,
+                                                    modifier = Modifier.clickable {
+                                                        expanded = !expanded
+                                                    })
+                                                DropdownMenu(
+                                                    expanded = expanded,
+                                                    onDismissRequest = { expanded = false }
+                                                ) {
+                                                    val DisabledAlpha = 0.38f
+                                                    val disabledItemColors = MenuDefaults.itemColors(
+                                                        textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha),
+                                                        leadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha),
+                                                        trailingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("${wsEntry.scores.score} Combined") },
+                                                        onClick = { },
+                                                        enabled = false,
+                                                        colors = disabledItemColors
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("${wsEntry.scores.programming} Autonomous Flight") },
+                                                        onClick = { },
+                                                        enabled = false,
+                                                        colors = disabledItemColors
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("${wsEntry.scores.driver} Piloting") },
+                                                        onClick = { },
+                                                        enabled = false,
+                                                        colors = disabledItemColors
+                                                    )
+
+                                                }
+                                                Spacer(modifier = Modifier.padding(horizontal = 5.dp))
+                                                Column {
+                                                    Text(
+                                                        wsEntry.scores.programming.toString(),
+                                                        fontSize = 12.sp
+                                                    )
+                                                    Text(wsEntry.scores.driver.toString(), fontSize = 12.sp)
+                                                }
                                             }
                                         }
-                                    }
 
-                                    if (index != filteredList.size - 1) {
-                                        HorizontalDivider(
-                                            thickness = 0.5.dp,
-                                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                                        )
+                                        if (index != filteredList.size - 1) {
+                                            HorizontalDivider(
+                                                thickness = 0.5.dp,
+                                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -443,4 +431,4 @@ fun WorldSkillsView(navController: NavController) {
             }
         }
     }
-}
+

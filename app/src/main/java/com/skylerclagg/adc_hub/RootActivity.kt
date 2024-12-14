@@ -3,7 +3,10 @@ package com.skylerclagg.adc_hub
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -587,5 +590,24 @@ fun RootActivity(navController: NavController) {
 
 
         // Ensure all other existing composables are preserved as well
+    }
+}
+
+/**
+ * Helper function to trigger vibration.
+ *
+ * @param vibrator The Vibrator service.
+ * @param duration Duration of the vibration in milliseconds. Default is 50ms.
+ */
+fun triggerVibration(vibrator: Vibrator, duration: Long = 50L) {
+    if (vibrator.hasVibrator()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(duration)
+        }
     }
 }
