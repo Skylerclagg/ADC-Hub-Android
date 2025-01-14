@@ -101,6 +101,20 @@ class UserSettings(context: Context) {
         editor.putString(key, value)
         editor.apply()
     }
+    companion object {
+        private const val PREFS_NAME = "adc_hub_settings"
+        private const val KEY_ENABLE_VIBRATION = "enable_vibration"
+    }
+    private val sharedPrefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun getEnableVibration(): Boolean {
+        return sharedPrefs.getBoolean(KEY_ENABLE_VIBRATION, true)
+    }
+
+    fun setEnableVibration(value: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_ENABLE_VIBRATION, value).apply()
+    }
 
     fun getData(key: String, defaultValue: String): String {
         return userSettings.getString(key, defaultValue) ?: defaultValue

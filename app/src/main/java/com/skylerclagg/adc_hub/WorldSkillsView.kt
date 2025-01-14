@@ -98,14 +98,6 @@ fun WorldSkillsView(navController: NavController) {
         viewTitle = "Favorites Skills"
     }
 
-    // Filter by letter
-    fun filterByLetter(letter: Char) {
-        filteredLetter = letter
-        filteredRegion = 0
-        isFilteredByFavorites = false
-        viewTitle = "$letter Skills"
-    }
-
     // Filter by region
     fun filterByRegion(region: Int, regionName: String) {
         filteredRegion = region
@@ -238,14 +230,6 @@ fun WorldSkillsView(navController: NavController) {
                                 color = Color.Gray.copy(alpha = 0.1f),
                                 thickness = 0.5.dp,
                                 modifier = Modifier.padding(horizontal = 5.dp)
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text(letter.toString()) },
-                                onClick = {
-                                    filterByLetter(letter)
-                                    filterDropdownExpanded = false
-                                }
                             )
                         }
                     }

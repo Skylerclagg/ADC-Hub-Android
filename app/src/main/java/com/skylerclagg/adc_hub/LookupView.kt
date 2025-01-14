@@ -89,7 +89,7 @@ class LookupViewModel : ViewModel() {
     var teamTextColor = mutableStateOf(Color.Gray)
     var number = mutableStateOf("12345a\u200B")
     var team = mutableStateOf(Team())
-    var wsEntry = mutableStateOf<Pair<WSEntry, Int>?>(null) // Updated to hold Pair<WSEntry, Int> or null
+    var wsEntry = mutableStateOf<Pair<WSEntry, Int>?>(null)
     var avgRanking = mutableDoubleStateOf(0.0)
     var awardCounts = LinkedHashMap<String, Int>()
     var fetchedTeams = mutableStateOf(false)
@@ -102,6 +102,13 @@ class LookupViewModel : ViewModel() {
     var page = mutableIntStateOf(1)
     var fetchedEvents = mutableStateOf(false)
     var loadingEvents = mutableStateOf(false)
+
+    /**
+     * Mirroring the iOS approach: if true, we apply a date filter
+     * (two weeks ago) when the user hasn’t entered a name.
+     * If false, we fetch all events from 01-Jan-1970.
+     */
+    var isDateFilterActive = mutableStateOf(true)
 
     fun fetchTeam() {
         loadingTeams.value = true
@@ -132,19 +139,20 @@ class LookupViewModel : ViewModel() {
         noLeagues: Boolean = false,
         page: Int = 1
     ) {
-
         loadingEvents.value = true
         eventTextColor.value = Color.Unspecified
 
         val scraperParams = mutableMapOf<String, Any>()
 
-        if (name != null && name != "") {
+        // If user typed a name, we apply the "name" filter
+        if (!name.isNullOrEmpty()) {
             scraperParams["name"] = name
         }
         if (season != null) {
             scraperParams["seasonId"] = season
         }
-        if (noLeagues || name == null || name == "") {
+        // If 'noLeagues' is true or user typed no name, we set eventType = 1
+        if (noLeagues || name.isNullOrEmpty()) {
             scraperParams["eventType"] = 1
         }
         if (level != null) {
@@ -154,13 +162,23 @@ class LookupViewModel : ViewModel() {
             scraperParams["event_region"] = region
         }
 
+        // Page number
         scraperParams["page"] = page
 
-        scraperParams["seasonId"] = UserSettings(applicationContext!!).getSelectedSeasonId()
+        // Always override "seasonId" if none was passed
+        scraperParams["seasonId"] = season ?: UserSettings(applicationContext!!).getSelectedSeasonId()
 
+        // If the date filter is active, show events from two weeks ago; else show everything
         val formatter = SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH)
-
-        scraperParams["from_date"] = if (name.isNullOrEmpty()) formatter.format(Date()) else "01-Jan-1970"
+        if (isDateFilterActive.value) {
+            // Calculate 2 weeks ago
+            val twoWeeksAgoMillis = System.currentTimeMillis() - (14L * 24L * 60L * 60L * 1000L)
+            val twoWeeksAgo = Date(twoWeeksAgoMillis)
+            scraperParams["from_date"] = formatter.format(twoWeeksAgo)
+        } else {
+            // If date filter is disabled, fetch everything
+            scraperParams["from_date"] = "01-Jan-1970"
+        }
 
         CoroutineScope(Dispatchers.Default).launch {
             val skuArray = ADCHubAPI.roboteventsCompetitionScraper(params = scraperParams)
@@ -173,20 +191,51 @@ class LookupViewModel : ViewModel() {
                 return@launch
             }
             val data = ADCHubAPI.roboteventsRequest(
-                requestUrl = "/seasons/${season ?: UserSettings(applicationContext!!).getSelectedSeasonId()}/events",
+                requestUrl = "/seasons/${scraperParams["seasonId"]}/events",
                 params = mapOf("sku" to skuArray)
             )
             withContext(Dispatchers.Main) {
-                val fetchedEventsList = mutableListOf<Event>()
-                for (eventData in data) {
-                    val fetchedEvent: Event = jsonWorker.decodeFromJsonElement(eventData)
-                    fetchedEventsList.add(fetchedEvent)
-                }
+                val fetchedEventsList = data.map { jsonWorker.decodeFromJsonElement<Event>(it) }
                 events.value = fetchedEventsList
                 fetchedEvents.value = true
                 loadingEvents.value = false
             }
         }
+    }
+}
+
+/**
+ * A simple row composable with a label on the left and
+ * a value on the right, wrapped in multiple lines if needed.
+ */
+@Composable
+fun InfoRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    labelWeight: Float = 1f,
+    valueWeight: Float = 2f,
+    textAlign: TextAlign = TextAlign.Start
+) {
+    Row(
+        modifier = modifier
+            // Slightly more space on the left
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(labelWeight),
+            textAlign = TextAlign.Start,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = value,
+            modifier = Modifier.weight(valueWeight),
+            textAlign = textAlign
+            // No maxLines here, so it will wrap automatically.
+        )
     }
 }
 
@@ -197,7 +246,6 @@ fun LookupView(
     lookupViewModel: LookupViewModel = viewModels["lookup_view"] as LookupViewModel,
     navController: NavController
 ) {
-
     val userSettings = UserSettings(LocalContext.current)
 
     Column(
@@ -217,6 +265,7 @@ fun LookupView(
                 )
             },
             bottomBar = {
+                // Only show bottom bar if user is on "Events" tab
                 if (lookupViewModel.lookupType.value != "Teams") {
                     Row(
                         horizontalArrangement = Arrangement.Center,
@@ -228,17 +277,24 @@ fun LookupView(
                         IconButton(
                             enabled = lookupViewModel.page.intValue != 1,
                             onClick = {
+                                // Re-assert date filter based on current search text
+                                lookupViewModel.isDateFilterActive.value =
+                                    lookupViewModel.eventName.value.isEmpty()
+
                                 lookupViewModel.page.intValue -= 1
                                 lookupViewModel.fetchEvents(
                                     name = lookupViewModel.eventName.value,
-                                    page = lookupViewModel.page.intValue,
+                                    page = lookupViewModel.page.intValue
                                 )
                             }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBackIos,
                                 contentDescription = "Previous Page",
                                 modifier = Modifier.width(30.dp),
-                                tint = if (lookupViewModel.page.intValue != 1) MaterialTheme.colorScheme.button else Color.Gray
+                                tint = if (lookupViewModel.page.intValue != 1)
+                                    MaterialTheme.colorScheme.button
+                                else
+                                    Color.Gray
                             )
                         }
                         Text(
@@ -250,17 +306,24 @@ fun LookupView(
                         IconButton(
                             enabled = lookupViewModel.events.value.size == 20,
                             onClick = {
+                                // Re-assert date filter based on current search text
+                                lookupViewModel.isDateFilterActive.value =
+                                    lookupViewModel.eventName.value.isEmpty()
+
                                 lookupViewModel.page.intValue += 1
                                 lookupViewModel.fetchEvents(
                                     name = lookupViewModel.eventName.value,
-                                    page = lookupViewModel.page.intValue,
+                                    page = lookupViewModel.page.intValue
                                 )
                             }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowForwardIos,
                                 contentDescription = "Next Page",
                                 modifier = Modifier.width(30.dp),
-                                tint = if (lookupViewModel.events.value.size == 20) MaterialTheme.colorScheme.button else Color.Gray
+                                tint = if (lookupViewModel.events.value.size == 20)
+                                    MaterialTheme.colorScheme.button
+                                else
+                                    Color.Gray
                             )
                         }
                     }
@@ -276,14 +339,18 @@ fun LookupView(
                     onSegmentSelected = { lookupViewModel.lookupType.value = it },
                     modifier = Modifier.padding(10.dp)
                 ) {
-                    SegmentText(
-                        text = it
-                    )
+                    SegmentText(text = it)
                 }
                 if (lookupViewModel.lookupType.value == "Teams") {
-                    TeamLookup(lookupViewModel = lookupViewModel, navController = navController)
+                    TeamLookup(
+                        lookupViewModel = lookupViewModel,
+                        navController = navController
+                    )
                 } else {
-                    EventLookup(lookupViewModel = lookupViewModel, navController = navController)
+                    EventLookup(
+                        lookupViewModel = lookupViewModel,
+                        navController = navController
+                    )
                 }
             }
         }
@@ -292,9 +359,7 @@ fun LookupView(
 
 @Composable
 fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
-
     val keyboardController = LocalSoftwareKeyboardController.current
-
     val localContext = LocalContext.current
     val userSettings = remember { UserSettings(localContext) }
     val isFocused = remember { mutableStateOf(false) }
@@ -317,7 +382,7 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                 .padding(horizontal = 20.dp)
                 .fillMaxWidth()
         ) {
-            Spacer(Modifier.width(14.dp)) // Thank you Android for making spacing weird
+            Spacer(Modifier.width(14.dp))
             Icon(
                 Icons.Filled.Star,
                 modifier = Modifier
@@ -349,7 +414,10 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                 textStyle = LocalTextStyle.current.copy(
                     textAlign = TextAlign.Center,
                     fontSize = 34.sp,
-                    color = if (lookupViewModel.number.value.isEmpty() || lookupViewModel.number.value == "12345a\u200B") Color.Gray else MaterialTheme.colorScheme.onSurface
+                    color = if (
+                        lookupViewModel.number.value.isEmpty() ||
+                        lookupViewModel.number.value == "12345a\u200B"
+                    ) Color.Gray else MaterialTheme.colorScheme.onSurface
                 ),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -365,7 +433,8 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                     onDone = {
                         keyboardController?.hide()
                         lookupViewModel.fetchTeam()
-                    }),
+                    }
+                ),
                 placeholder = {
                     if (!isFocused.value && lookupViewModel.number.value.isEmpty()) {
                         Text(
@@ -383,14 +452,28 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
             Spacer(modifier = Modifier.weight(1.0f))
             Box {
                 IconButton(
-                    enabled = lookupViewModel.number.value != "12345a\u200B" && lookupViewModel.number.value.isNotBlank(),
-                    modifier = Modifier.alpha(if (lookupViewModel.number.value != "12345a\u200B" && lookupViewModel.number.value.isNotBlank()) 1F else 0F),
+                    enabled = lookupViewModel.number.value != "12345a\u200B" &&
+                            lookupViewModel.number.value.isNotBlank(),
+                    modifier = Modifier.alpha(
+                        if (
+                            lookupViewModel.number.value != "12345a\u200B" &&
+                            lookupViewModel.number.value.isNotBlank()
+                        ) 1F else 0F
+                    ),
                     onClick = {
                         favoriteTeams =
-                            if (lookupViewModel.number.value.isEmpty() || lookupViewModel.number.value == "12345a\u200B") {
+                            if (
+                                lookupViewModel.number.value.isEmpty() ||
+                                lookupViewModel.number.value == "12345a\u200B"
+                            ) {
                                 return@IconButton
-                            } else if (favoriteTeams.contains(lookupViewModel.number.value.uppercase()) && !lookupViewModel.loadingTeams.value) {
-                                userSettings.removeFavoriteTeam(lookupViewModel.number.value.uppercase())
+                            } else if (
+                                favoriteTeams.contains(lookupViewModel.number.value.uppercase()) &&
+                                !lookupViewModel.loadingTeams.value
+                            ) {
+                                userSettings.removeFavoriteTeam(
+                                    lookupViewModel.number.value.uppercase()
+                                )
                                 userSettings.getData("favoriteTeams", "").replace("[", "")
                                     .replace("]", "")
                                     .split(", ")
@@ -401,14 +484,20 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                                     lookupViewModel.fetchTeam()
                                     return@IconButton
                                 } else {
-                                    userSettings.addFavoriteTeam(lookupViewModel.number.value.uppercase())
+                                    userSettings.addFavoriteTeam(
+                                        lookupViewModel.number.value.uppercase()
+                                    )
                                     userSettings.getData("favoriteTeams", "").replace("[", "")
                                         .replace("]", "")
                                         .split(", ")
                                 }
                             }
-                    }) {
-                    if (favoriteTeams.contains(lookupViewModel.number.value.uppercase()) && lookupViewModel.number.value.isNotBlank()) {
+                    }
+                ) {
+                    if (
+                        favoriteTeams.contains(lookupViewModel.number.value.uppercase()) &&
+                        lookupViewModel.number.value.isNotBlank()
+                    ) {
                         Icon(
                             Icons.Filled.Star,
                             contentDescription = "Unfavorite",
@@ -428,12 +517,12 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
         }
         if (lookupViewModel.loadingTeams.value) {
             Column(
-                modifier = Modifier.height(60.dp),
+                modifier = Modifier.height(20.dp),
             ) {
                 LoadingView()
             }
         } else {
-            Spacer(Modifier.height(60.dp))
+            Spacer(Modifier.height(20.dp))
         }
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState())
@@ -449,80 +538,88 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.padding(10.dp)
                 ) {
-                    Column {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Name")
-                            Spacer(modifier = Modifier.weight(1.0f))
-                            Text(if (lookupViewModel.fetchedTeams.value) lookupViewModel.team.value.name else "")
-                        }
-                    }
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+
+                    // Name
+                    InfoRow(
+                        label = "Name",
+                        value = if (lookupViewModel.fetchedTeams.value)
+                            lookupViewModel.team.value.name
+                        else ""
                     )
-                    Row {
-                        Text("Robot")
-                        Spacer(modifier = Modifier.weight(1.0f))
-                        Text(if (lookupViewModel.fetchedTeams.value) (lookupViewModel.team.value.robotName ?: "") else "")
-                    }
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                    )
-                    Row {
-                        Text("Organization")
-                        Spacer(modifier = Modifier.weight(1.0f))
-                        Text(if (lookupViewModel.fetchedTeams.value) lookupViewModel.team.value.organization else "")
-                    }
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                    )
-                    Row {
-                        Text("Location")
-                        Spacer(modifier = Modifier.weight(1.0f))
-                        Text(
-                            if (lookupViewModel.fetchedTeams.value && (lookupViewModel.team.value.location.country
-                                    ?: "").isNotEmpty()
-                            ) lookupViewModel.team.value.location.toString() else ""
-                        )
-                    }
                     HorizontalDivider(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                     )
 
-                    var tsExpanded by remember { mutableStateOf(false) }
-
-
-                    Row {
-                        Text("World Skills Ranking")
-                        Spacer(modifier = Modifier.weight(1.0f))
-                        Text(
-                            if (lookupViewModel.fetchedTeams.value) {
-                                if (lookupViewModel.wsEntry.value != null) {
-                                    val (wsEntry, cacheSize) = lookupViewModel.wsEntry.value!!
-                                    "# ${wsEntry.rank} of $cacheSize"
-                                } else {
-                                    "No Data Available"
-                                }
-                            } else ""
-                        )
-                    }
+                    // Robot
+                    InfoRow(
+                        label = "Robot",
+                        value = if (lookupViewModel.fetchedTeams.value)
+                            (lookupViewModel.team.value.robotName ?: "")
+                        else ""
+                    )
                     HorizontalDivider(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                     )
 
+                    // Organization (wraps if it's too long)
+                    InfoRow(
+                        label = "Organization",
+                        value = if (lookupViewModel.fetchedTeams.value)
+                            lookupViewModel.team.value.organization
+                        else ""
+                    )
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                    )
+
+                    // Location
+                    InfoRow(
+                        label = "Location",
+                        value =
+                        if (
+                            lookupViewModel.fetchedTeams.value &&
+                            (lookupViewModel.team.value.location.country ?: "").isNotEmpty()
+                        ) {
+                            lookupViewModel.team.value.location.toString()
+                        } else ""
+                    )
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                    )
+
+                    // World Skills Ranking
+                    InfoRow(
+                        label = "World Skills Ranking",
+                        value =
+                        if (lookupViewModel.fetchedTeams.value) {
+                            if (lookupViewModel.wsEntry.value != null) {
+                                val (wsEntry, cacheSize) = lookupViewModel.wsEntry.value!!
+                                "# ${wsEntry.rank} of $cacheSize"
+                            } else {
+                                "No Data Available"
+                            }
+                        } else ""
+                    )
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                    )
+
+                    // World Skills Score (clickable with dropdown)
                     var wsExpanded by remember { mutableStateOf(false) }
 
                     Row {
                         Text(
                             "World Skills Score",
-                            modifier = if (lookupViewModel.fetchedTeams.value && lookupViewModel.wsEntry.value != null) {
-                                Modifier.clickable {
-                                    wsExpanded = !wsExpanded
-                                }
+                            modifier =
+                            if (lookupViewModel.fetchedTeams.value &&
+                                lookupViewModel.wsEntry.value != null
+                            ) {
+                                Modifier.clickable { wsExpanded = !wsExpanded }
                             } else {
                                 Modifier
                             },
@@ -537,21 +634,18 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                                 DropdownMenuItem(
                                     text = { Text("${wsEntry.scores.programming} autonomous") },
                                     onClick = { },
-                                    enabled = false,
-                                    colors = disabledMenuItemColors(MaterialTheme)
+                                    enabled = false
                                 )
                                 DropdownMenuItem(
                                     text = { Text("${wsEntry.scores.driver} Piloting") },
                                     onClick = { },
-                                    enabled = false,
-                                    colors = disabledMenuItemColors(MaterialTheme)
+                                    enabled = false
                                 )
                             } else {
                                 DropdownMenuItem(
                                     text = { Text("No Data Available") },
                                     onClick = { },
-                                    enabled = false,
-                                    colors = disabledMenuItemColors(MaterialTheme)
+                                    enabled = false
                                 )
                             }
                         }
@@ -571,18 +665,15 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                     )
 
-                    var msExpanded by remember { mutableStateOf(false) }
-
-
+                    // Awards (clickable with dropdown)
                     var awardsExpanded by remember { mutableStateOf(false) }
 
                     Row {
                         Text(
                             "Awards",
-                            modifier = if (lookupViewModel.fetchedTeams.value) {
-                                Modifier.clickable {
-                                    awardsExpanded = !awardsExpanded
-                                }
+                            modifier =
+                            if (lookupViewModel.fetchedTeams.value) {
+                                Modifier.clickable { awardsExpanded = !awardsExpanded }
                             } else {
                                 Modifier
                             },
@@ -596,30 +687,30 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
                                 DropdownMenuItem(
                                     text = { Text("${award.value}x ${award.key}") },
                                     onClick = { },
-                                    enabled = false,
-                                    colors = disabledMenuItemColors(MaterialTheme)
+                                    enabled = false
                                 )
                             }
                         }
                         Spacer(modifier = Modifier.weight(1.0f))
                         Text(
-                            if (lookupViewModel.fetchedTeams.value) "${lookupViewModel.team.value.awards.size}" else ""
+                            if (lookupViewModel.fetchedTeams.value)
+                                "${lookupViewModel.team.value.awards.size}"
+                            else ""
                         )
                     }
                     HorizontalDivider(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                     )
+
+                    // Events row (clickable)
                     Column(
-                        modifier = if (lookupViewModel.fetchedTeams.value) {
+                        modifier =
+                        if (lookupViewModel.fetchedTeams.value) {
                             Modifier.clickable {
-                                if (lookupViewModel.fetchedTeams.value) {
-                                    navController.navigate(
-                                        TeamEventsViewDestination(
-                                            lookupViewModel.team.value
-                                        )
-                                    )
-                                }
+                                navController.navigate(
+                                    TeamEventsViewDestination(lookupViewModel.team.value)
+                                )
                             }
                         } else {
                             Modifier
@@ -652,14 +743,13 @@ fun TeamLookup(lookupViewModel: LookupViewModel, navController: NavController) {
 @Composable
 fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) {
     val userSettings = UserSettings(LocalContext.current)
-
     val keyboardController = LocalSoftwareKeyboardController.current
     val isFocused = remember { mutableStateOf(false) }
 
+    // If events list is empty, fetch on first load
     LaunchedEffect(Unit) {
         if (lookupViewModel.events.value.isEmpty()) {
-            lookupViewModel.fetchEvents(
-            )
+            lookupViewModel.fetchEvents()
             lookupViewModel.page.intValue = 1
         }
     }
@@ -676,9 +766,16 @@ fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) 
                 .padding(horizontal = 20.dp)
                 .fillMaxWidth()
         ) {
+            // Search text field
             TextField(
                 value = lookupViewModel.eventName.value,
-                onValueChange = { lookupViewModel.eventName.value = it },
+                onValueChange = {
+                    lookupViewModel.eventName.value = it
+
+                    // If user typed something, disable the date filter (like iOS)
+                    // If user cleared the name, enable the date filter
+                    lookupViewModel.isDateFilterActive.value = it.isEmpty()
+                },
                 singleLine = true,
                 interactionSource = remember { MutableInteractionSource() }
                     .also { interactionSource ->
@@ -690,6 +787,8 @@ fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) 
                                     is PressInteraction.Release -> {
                                         lookupViewModel.eventName.value = ""
                                         lookupViewModel.fetchedEvents.value = false
+                                        // Re-enable date filter if needed
+                                        lookupViewModel.isDateFilterActive.value = true
                                     }
                                 }
                             }
@@ -698,7 +797,10 @@ fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) 
                 textStyle = LocalTextStyle.current.copy(
                     textAlign = TextAlign.Center,
                     fontSize = 34.sp,
-                    color = if (lookupViewModel.eventName.value.isEmpty() || lookupViewModel.eventName.value == "Event Name\u200B") Color.Gray else MaterialTheme.colorScheme.onSurface
+                    color = if (
+                        lookupViewModel.eventName.value.isEmpty() ||
+                        lookupViewModel.eventName.value == "Event Name\u200B"
+                    ) Color.Gray else MaterialTheme.colorScheme.onSurface
                 ),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -713,12 +815,14 @@ fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) 
                 keyboardActions = KeyboardActions(
                     onDone = {
                         keyboardController?.hide()
+                        // Now fetch events:
+                        lookupViewModel.page.intValue = 1
                         lookupViewModel.fetchEvents(
                             name = lookupViewModel.eventName.value,
-                            page = 1
+                            page = lookupViewModel.page.intValue
                         )
-                        lookupViewModel.page.intValue = 1
-                    }),
+                    }
+                ),
                 placeholder = {
                     if (!isFocused.value && lookupViewModel.eventName.value.isEmpty()) {
                         Text(
@@ -766,7 +870,9 @@ fun EventLookup(lookupViewModel: LookupViewModel, navController: NavController) 
                             ) {
                                 EventRow(navController, event)
                             }
-                            if (lookupViewModel.events.value.indexOf(event) != lookupViewModel.events.value.size - 1) {
+                            if (lookupViewModel.events.value.indexOf(event) !=
+                                lookupViewModel.events.value.size - 1
+                            ) {
                                 HorizontalDivider(
                                     thickness = 0.5.dp,
                                     color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),

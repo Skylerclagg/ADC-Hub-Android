@@ -69,11 +69,13 @@ val CustomRed = Color(0xFFD32020)
 fun TeamworkScoreCalculator() {
     val isDarkTheme = isSystemInDarkTheme()
 
-    // Obtain Vibrator service
+    // Obtain Vibrator service & user settings
     val context = LocalContext.current
-    val vibrator = remember {
-        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-    }
+    val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+
+    // (1) Retrieve the user's vibration setting
+    val userSettings = UserSettings(LocalContext.current)
+    val enableVibration = userSettings.getEnableVibration() // assumed existing method
 
     // State variables
     var dropZoneTopCleared by remember { mutableStateOf(0) }
@@ -86,17 +88,25 @@ fun TeamworkScoreCalculator() {
     var blueDroneSelection by remember { mutableStateOf("None") }
 
     val totalScore = calculateTotalScore(
-        dropZoneTopCleared, greenBeanBags, blueBeanBags,
-        neutralBalls, greenBalls, blueBalls, redDroneSelection, blueDroneSelection
+        dropZoneTopCleared,
+        greenBeanBags,
+        blueBeanBags,
+        neutralBalls,
+        greenBalls,
+        blueBalls,
+        redDroneSelection,
+        blueDroneSelection
     )
 
     val showTopsClearedWarning = (greenBeanBags + blueBeanBags) > dropZoneTopCleared
-    val showDroneWarning = redDroneSelection != "None" && redDroneSelection == blueDroneSelection
-    val showBothLandingPadWarning = (redDroneSelection == "Landing Pad" && blueDroneSelection == "Bullseye") ||
-            (redDroneSelection == "Bullseye" && blueDroneSelection == "Landing Pad")
+    val showDroneWarning = (redDroneSelection != "None" && redDroneSelection == blueDroneSelection)
+    val showBothLandingPadWarning =
+        (redDroneSelection == "Landing Pad" && blueDroneSelection == "Bullseye") ||
+                (redDroneSelection == "Bullseye" && blueDroneSelection == "Landing Pad")
 
     val beanBagsUsed = greenBeanBags + blueBeanBags
     val remainingBeanBags = max(0, 7 - beanBagsUsed)
+
     val ballsUsed = neutralBalls + greenBalls + blueBalls
     val remainingBalls = max(0, 10 - ballsUsed)
 
@@ -106,7 +116,8 @@ fun TeamworkScoreCalculator() {
                 title = { Text("Teamwork Score Calculator") },
                 actions = {
                     IconButton(onClick = {
-                        triggerVibration(vibrator)
+                        // (2) Only vibrate if enabled
+                        if (enableVibration) triggerVibration(vibrator)
 
                         // Clear all inputs
                         dropZoneTopCleared = 0
@@ -145,15 +156,13 @@ fun TeamworkScoreCalculator() {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Center the Row and give each card a fixed width
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
                 val cardWidth = 200.dp
 
+                // Bean Bag Card
                 ElevatedCard(
                     modifier = Modifier
                         .width(cardWidth)
@@ -163,8 +172,9 @@ fun TeamworkScoreCalculator() {
                         modifier = Modifier.padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Bean Bags section text now at 14sp
                         Text("Bean Bags", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+
+                        // Tops Cleared
                         CounterSection(
                             title = "Tops Cleared",
                             count = dropZoneTopCleared,
@@ -174,8 +184,10 @@ fun TeamworkScoreCalculator() {
                             showWarning = showTopsClearedWarning,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
+                        // Green Drop Zone
                         CounterSection(
                             title = "Green Drop Zone",
                             count = greenBeanBags,
@@ -185,8 +197,10 @@ fun TeamworkScoreCalculator() {
                             showWarning = showTopsClearedWarning,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
+                        // Blue Drop Zone
                         CounterSection(
                             title = "Blue Drop Zone",
                             count = blueBeanBags,
@@ -196,6 +210,7 @@ fun TeamworkScoreCalculator() {
                             showWarning = showTopsClearedWarning,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
                         if (showTopsClearedWarning) {
@@ -208,6 +223,7 @@ fun TeamworkScoreCalculator() {
 
                 Spacer(modifier = Modifier.width(10.dp))
 
+                // Balls Card
                 ElevatedCard(
                     modifier = Modifier
                         .width(cardWidth)
@@ -217,9 +233,9 @@ fun TeamworkScoreCalculator() {
                         modifier = Modifier.padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Balls section text now at 14sp
                         Text("Balls", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
 
+                        // Green
                         CounterSection(
                             title = "Green Zone",
                             count = greenBalls,
@@ -228,8 +244,10 @@ fun TeamworkScoreCalculator() {
                             accentColor = CustomGreen,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
+                        // Neutral
                         CounterSection(
                             title = "Neutral Zone",
                             count = neutralBalls,
@@ -238,8 +256,10 @@ fun TeamworkScoreCalculator() {
                             accentColor = Color.Gray,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
+                        // Blue
                         CounterSection(
                             title = "Blue Zone",
                             count = blueBalls,
@@ -248,6 +268,7 @@ fun TeamworkScoreCalculator() {
                             accentColor = CustomBlue,
                             titleFontSize = 14,
                             vibrator = vibrator,
+                            enableVibration = enableVibration
                         )
 
                         Text("Remaining Balls: $remainingBalls", color = CustomRed, fontSize = 14.sp)
@@ -257,7 +278,7 @@ fun TeamworkScoreCalculator() {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Drones Section
+            // Drones
             Row(modifier = Modifier.fillMaxWidth()) {
                 DroneBox(
                     droneColor = "Red",
@@ -266,6 +287,7 @@ fun TeamworkScoreCalculator() {
                     onSelect = { redDroneSelection = it },
                     modifier = Modifier.fillMaxWidth(0.5f),
                     vibrator = vibrator,
+                    enableVibration = enableVibration
                 )
 
                 DroneBox(
@@ -275,6 +297,7 @@ fun TeamworkScoreCalculator() {
                     onSelect = { blueDroneSelection = it },
                     modifier = Modifier.fillMaxWidth(),
                     vibrator = vibrator,
+                    enableVibration = enableVibration
                 )
             }
 
@@ -337,7 +360,9 @@ fun ScoreView(totalScore: Int, showWarning: Boolean, modifier: Modifier = Modifi
     }
 }
 
-// Added a new parameter titleFontSize to adjust the label font sizes in the bean bag/ball sections.
+/**
+ * Updated to accept enableVibration, so we only trigger it if true.
+ */
 @Composable
 fun CounterSection(
     title: String,
@@ -348,6 +373,7 @@ fun CounterSection(
     showWarning: Boolean = false,
     titleFontSize: Int = 12,
     vibrator: Vibrator,
+    enableVibration: Boolean
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -360,7 +386,9 @@ fun CounterSection(
         Spacer(modifier = Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             IconButton(onClick = {
-                triggerVibration(vibrator)
+                if (enableVibration) {
+                    triggerVibration(vibrator)
+                }
                 if (count > 0) onCountChange(count - 1)
             }) {
                 Icon(Icons.Default.RemoveCircle, contentDescription = "Decrease", tint = CustomRed)
@@ -376,7 +404,9 @@ fun CounterSection(
             Spacer(modifier = Modifier.width(16.dp))
 
             IconButton(onClick = {
-                triggerVibration(vibrator)
+                if (enableVibration) {
+                    triggerVibration(vibrator)
+                }
                 if (count < maxCount) onCountChange(count + 1)
             }) {
                 Icon(Icons.Default.AddCircle, contentDescription = "Increase", tint = CustomGreen)
@@ -388,6 +418,9 @@ fun CounterSection(
     }
 }
 
+/**
+ * DroneBox updated with enableVibration param
+ */
 @Composable
 fun DroneBox(
     droneColor: String,
@@ -396,19 +429,24 @@ fun DroneBox(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     vibrator: Vibrator,
+    enableVibration: Boolean
 ) {
     val droneUIColor = if (droneColor == "Red") CustomRed else CustomBlue
     val options = listOf("None", "Small Cube", "Large Cube", "Landing Pad", "Bullseye")
 
     ElevatedCard(
-        modifier = modifier
-            .heightIn(min = 200.dp, max = 220.dp)
+        modifier = modifier.heightIn(min = 200.dp, max = 220.dp)
     ) {
         Column(
             modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("$droneColor Drone", fontWeight = FontWeight.SemiBold, color = droneUIColor, fontSize = 14.sp)
+            Text(
+                "$droneColor Drone",
+                fontWeight = FontWeight.SemiBold,
+                color = droneUIColor,
+                fontSize = 14.sp
+            )
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -425,7 +463,9 @@ fun DroneBox(
                         isDisabled = isDisabled,
                         droneColor = droneUIColor,
                         onClick = {
-                            triggerVibration(vibrator)
+                            if (enableVibration) {
+                                triggerVibration(vibrator)
+                            }
                             onSelect(option)
                         }
                     )

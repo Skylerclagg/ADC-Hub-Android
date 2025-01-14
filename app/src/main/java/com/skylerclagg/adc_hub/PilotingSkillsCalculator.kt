@@ -66,6 +66,12 @@ fun PilotingSkillsCalculator() {
 
     val vibrator = LocalContext.current.let { remember { it.getVibrator() } }
 
+    // 1) Retrieve the user setting that decides if vibrations are allowed
+    //    This is a placeholder function: userSettings.getEnableVibration()
+    //    or wherever you stored that boolean.
+    val userSettings = UserSettings(LocalContext.current)
+    val enableVibration = userSettings.getEnableVibration() // assumed method
+
     // State variables
     var didTakeOff by remember { mutableStateOf(false) }
     var figure8Count by remember { mutableStateOf(0) }
@@ -89,11 +95,19 @@ fun PilotingSkillsCalculator() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Piloting Skills Calculator", color = primaryTextColor, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Piloting Skills Calculator",
+                        color = primaryTextColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 actions = {
                     IconButton(onClick = {
-                        triggerVibration(vibrator)
-
+                        // 2) Only vibrate if enableVibration is true
+                        if (enableVibration) {
+                            triggerVibration(vibrator)
+                        }
                         // Reset all inputs
                         didTakeOff = false
                         figure8Count = 0
@@ -115,7 +129,6 @@ fun PilotingSkillsCalculator() {
             )
         }
     ) { innerPadding ->
-
         CompositionLocalProvider(LocalContentColor provides primaryTextColor) {
             LazyColumn(
                 modifier = Modifier
@@ -159,7 +172,10 @@ fun PilotingSkillsCalculator() {
                         Switch(
                             checked = didTakeOff,
                             onCheckedChange = {
-                                triggerVibration(vibrator)
+                                // 3) Only vibrate if enableVibration is true
+                                if (enableVibration) {
+                                    triggerVibration(vibrator)
+                                }
                                 didTakeOff = it
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.Green)
@@ -174,7 +190,8 @@ fun PilotingSkillsCalculator() {
                         value = figure8Count,
                         onValueChange = { figure8Count = it },
                         labelColor = primaryTextColor,
-                        valueColor = primaryTextColor
+                        valueColor = primaryTextColor,
+                        enableVibration = enableVibration // pass down
                     )
                 }
 
@@ -185,7 +202,8 @@ fun PilotingSkillsCalculator() {
                         value = smallHoleCount,
                         onValueChange = { smallHoleCount = it },
                         labelColor = primaryTextColor,
-                        valueColor = primaryTextColor
+                        valueColor = primaryTextColor,
+                        enableVibration = enableVibration
                     )
                 }
 
@@ -196,7 +214,8 @@ fun PilotingSkillsCalculator() {
                         value = largeHoleCount,
                         onValueChange = { largeHoleCount = it },
                         labelColor = primaryTextColor,
-                        valueColor = primaryTextColor
+                        valueColor = primaryTextColor,
+                        enableVibration = enableVibration
                     )
                 }
 
@@ -207,19 +226,20 @@ fun PilotingSkillsCalculator() {
                         value = keyholeCount,
                         onValueChange = { keyholeCount = it },
                         labelColor = primaryTextColor,
-                        valueColor = primaryTextColor
+                        valueColor = primaryTextColor,
+                        enableVibration = enableVibration
                     )
                 }
 
-                // Landing Options Section
-
+                // Landing Option
                 item {
                     PilotDropdownInput(
                         label = "Select Landing Option",
                         options = LandingOption.values().toList(),
                         selectedOption = selectedLandingOption,
                         onOptionChange = { selectedLandingOption = it },
-                        labelColor = primaryTextColor
+                        labelColor = primaryTextColor,
+                        enableVibration = enableVibration
                     )
                 }
             }
@@ -236,7 +256,10 @@ fun SectionHeader(text: String, textColor: Color) {
             fontWeight = FontWeight.Bold,
             color = textColor
         )
-        Divider(modifier = Modifier.padding(vertical = 8.dp), color = textColor.copy(alpha = 0.5f))
+        Divider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            color = textColor.copy(alpha = 0.5f)
+        )
     }
 }
 
@@ -247,8 +270,10 @@ fun PilotStepperInput(
     maxValue: Int = Int.MAX_VALUE,
     onValueChange: (Int) -> Unit,
     labelColor: Color,
-    valueColor: Color
+    valueColor: Color,
+    enableVibration: Boolean
 ) {
+    // Just retrieve the context’s vibrator
     val vibrator = LocalContext.current.let { remember { it.getVibrator() } }
 
     Row(
@@ -256,14 +281,14 @@ fun PilotStepperInput(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Make the label bold
         Text(label, color = labelColor, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Change fontSize as needed for + and -.
-            // For example, to make the text larger, use fontSize = 20.sp
             Button(
                 onClick = {
-                    triggerVibration(vibrator)
+                    // Only vibrate if allowed
+                    if (enableVibration) {
+                        triggerVibration(vibrator)
+                    }
                     if (value > 0) onValueChange(value - 1)
                 },
                 modifier = Modifier.padding(4.dp),
@@ -281,7 +306,9 @@ fun PilotStepperInput(
             )
             Button(
                 onClick = {
-                    triggerVibration(vibrator)
+                    if (enableVibration) {
+                        triggerVibration(vibrator)
+                    }
                     if (value < maxValue) onValueChange(value + 1)
                 },
                 modifier = Modifier.padding(4.dp),
@@ -300,10 +327,10 @@ fun PilotDropdownInput(
     options: List<LandingOption>,
     selectedOption: LandingOption,
     onOptionChange: (LandingOption) -> Unit,
-    labelColor: Color
+    labelColor: Color,
+    enableVibration: Boolean
 ) {
     var expanded by remember { mutableStateOf(false) }
-
     val vibrator = LocalContext.current.let { remember { it.getVibrator() } }
 
     ExposedDropdownMenuBox(
@@ -330,10 +357,18 @@ fun PilotDropdownInput(
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option.displayName, color = primaryTextColor(), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            option.displayName,
+                            color = primaryTextColor(),
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     onClick = {
-                        triggerVibration(vibrator)
-
+                        // Only vibrate if allowed
+                        if (enableVibration) {
+                            triggerVibration(vibrator)
+                        }
                         onOptionChange(option)
                         expanded = false
                     }

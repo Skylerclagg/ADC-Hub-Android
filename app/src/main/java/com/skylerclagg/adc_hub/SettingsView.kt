@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+
 package com.skylerclagg.adc_hub
 
 import android.app.Activity
@@ -48,8 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.ramcosta.composedestinations.annotation.Destination
-import com.skylerclagg.adc_hub.helperviews.SegmentText
-import com.skylerclagg.adc_hub.helperviews.SegmentedControl
 import com.skylerclagg.adc_hub.ui.theme.button
 import com.skylerclagg.adc_hub.ui.theme.onTopContainer
 import com.skylerclagg.adc_hub.ui.theme.topContainer
@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 @Destination
 @Composable
 fun SettingsView(navController: NavController) {
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -76,6 +77,7 @@ fun SettingsView(navController: NavController) {
             )
         }
     ) { padding ->
+
         var update by remember { mutableStateOf(false) }
         val userSettings = UserSettings(LocalContext.current)
         val uriHandler = LocalUriHandler.current
@@ -90,6 +92,8 @@ fun SettingsView(navController: NavController) {
                     modifier = Modifier.verticalScroll(rememberScrollState())
                 ) {
                     Spacer(modifier = Modifier.height(10.dp))
+
+                    // (Optional) placeholder card or remove if empty
                     Card(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                         colors = CardColors(
@@ -98,19 +102,13 @@ fun SettingsView(navController: NavController) {
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             disabledContentColor = Color.Unspecified
                         ),
-                        // set radius
                         shape = MaterialTheme.shapes.large
                     ) {
-                        Column(
-
-                        ) {
-                             { {
-
-
-                                }
-                            }
+                        Column {
+                            // ...
                         }
                     }
+
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         "COMPETITION",
@@ -118,6 +116,8 @@ fun SettingsView(navController: NavController) {
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
+
+                    // ----- Season Selector (Re-implemented) -----
                     Card(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                         colors = CardColors(
@@ -131,41 +131,9 @@ fun SettingsView(navController: NavController) {
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                             modifier = Modifier.padding(horizontal = 10.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 10.dp)
-                            ) {
-                                var selectedGradeLevel by remember { mutableStateOf(userSettings.getGradeLevel()) }
-                                val gradeLevelMap = mapOf(
-                                    "Middle School" to "ADC MS",
-                                    "High School" to "ADC HS"
-                                )
-                                SegmentedControl(
-                                    gradeLevelMap.values.toList(),
-                                    gradeLevelMap[selectedGradeLevel] ?: "Unknown",
-                                    onSegmentSelected = {
-                                        val prevGradeLevel = selectedGradeLevel
-                                        userSettings.setGradeLevel(gradeLevelMap.entries.first { entry -> entry.value == it }.key)
-                                        selectedGradeLevel = userSettings.getGradeLevel()
-                                        val seasonIndex =
-                                            API.seasonsCache[if (prevGradeLevel == "College") 1 else 0].indexOfFirst { it.id == userSettings.getSelectedSeasonId() }
-                                        if (seasonIndex == -1) {
-                                            userSettings.setSelectedSeasonId(if (selectedGradeLevel == "College") BuildConfig.DEFAULT_VU_SEASON_ID else BuildConfig.DEFAULT_V5_SEASON_ID)
-                                        } else {
-                                            userSettings.setSelectedSeasonId(API.seasonsCache[if (selectedGradeLevel == "College") 1 else 0][seasonIndex].id)
-                                        }
-                                        API.importedWS = false
-                                        CoroutineScope(Dispatchers.Default).launch {
-                                            API.updateWorldSkillsCache()
-                                        }
-                                    },
-                                    modifier = Modifier.padding(7.dp)
-                                ) {
-                                    SegmentText(
-                                        text = it
-                                    )
-                                }
-                            }
+                            // Check if there's data in your seasons cache
                             if (API.seasonsCache[0].isNotEmpty()) {
+                                // For spacing
                                 HorizontalDivider(
                                     thickness = 0.5.dp,
                                     color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
@@ -173,25 +141,26 @@ fun SettingsView(navController: NavController) {
                                 Row(
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp)
                                 ) {
                                     Box {
                                         var expanded by remember { mutableStateOf(false) }
+
                                         DropdownMenu(
                                             expanded = expanded,
                                             onDismissRequest = { expanded = false }
                                         ) {
-                                            API.seasonsCache[if (userSettings.getGradeLevel() != "College") 0 else 1].forEach { entry ->
+                                            // Populate from seasonsCache[0]
+                                            API.seasonsCache[0].forEach { entry ->
                                                 DropdownMenuItem(
-                                                    text = {
-                                                        Text(
-                                                            entry.shortName
-                                                        )
-                                                    },
+                                                    text = { Text(entry.shortName) },
                                                     onClick = {
                                                         expanded = false
                                                         userSettings.setSelectedSeasonId(entry.id)
                                                         API.importedWS = false
+                                                        // Possibly update your WS Cache
                                                         CoroutineScope(Dispatchers.Default).launch {
                                                             API.updateWorldSkillsCache()
                                                         }
@@ -199,8 +168,14 @@ fun SettingsView(navController: NavController) {
                                                 )
                                             }
                                         }
+
+                                        // Show the currently selected season
+                                        val currentSeasonId = userSettings.getSelectedSeasonId()
+                                        val currentSeason = (API.seasonsCache[0])
+                                            .firstOrNull { it.id == currentSeasonId }
+
                                         Text(
-                                            (API.seasonsCache[0] + API.seasonsCache[1]).first { it.id == API.selectedSeasonId() }.shortName,
+                                            text = currentSeason?.shortName ?: "Unknown Season",
                                             color = MaterialTheme.colorScheme.button,
                                             modifier = Modifier.clickable {
                                                 expanded = !expanded
@@ -211,6 +186,7 @@ fun SettingsView(navController: NavController) {
                             }
                         }
                     }
+
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         "APPEARANCE",
@@ -218,6 +194,7 @@ fun SettingsView(navController: NavController) {
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
+
                     Card(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                         colors = CardColors(
@@ -231,12 +208,13 @@ fun SettingsView(navController: NavController) {
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                             modifier = Modifier.padding(horizontal = 10.dp)
                         ) {
+                            // ----------- Top Bar Color -----------
                             Row(
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
                                 var showDialog by remember { mutableStateOf(false) }
                                 var topContainerColor by remember { mutableStateOf(userSettings.getTopContainerColor()) }
-                                var update by remember { mutableStateOf(false) }
+                                var updateColor by remember { mutableStateOf(false) }
 
                                 ColorPickerDialog(
                                     show = showDialog,
@@ -251,12 +229,12 @@ fun SettingsView(navController: NavController) {
                                     onPickedColor = {
                                         topContainerColor = it
                                         userSettings.setTopContainerColor(it)
-                                        update = true
+                                        updateColor = true
                                         showDialog = false
                                     }
                                 )
 
-                                if (update) {
+                                if (updateColor) {
                                     MaterialTheme.colorScheme.topContainer = topContainerColor
                                     val view = LocalView.current
                                     if (!view.isInEditMode && !userSettings.getMinimalisticMode()) {
@@ -266,11 +244,12 @@ fun SettingsView(navController: NavController) {
                                             window.navigationBarColor = topContainerColor.toArgb()
                                         }
                                     }
-                                    update = false
+                                    updateColor = false
                                 }
 
                                 Text("Top Bar Color", modifier = Modifier.weight(1f))
-                                Text("Change",
+                                Text(
+                                    "Change",
                                     color = if (userSettings.getTopContainerColor().isSpecified) {
                                         userSettings.getTopContainerColor()
                                     } else {
@@ -285,13 +264,16 @@ fun SettingsView(navController: NavController) {
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                             )
-                            // Top Bar Content Color (MaterialTheme.colorScheme.onTopContainer)
+
+                            // ----------- Top Bar Content Color -----------
                             Row(
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
                                 var showDialog by remember { mutableStateOf(false) }
-                                var onTopContainerColor by remember { mutableStateOf(userSettings.getOnTopContainerColor()) }
-                                var update by remember { mutableStateOf(false) }
+                                var onTopContainerColor by remember {
+                                    mutableStateOf(userSettings.getOnTopContainerColor())
+                                }
+                                var updateColor by remember { mutableStateOf(false) }
 
                                 ColorPickerDialog(
                                     show = showDialog,
@@ -306,18 +288,19 @@ fun SettingsView(navController: NavController) {
                                     onPickedColor = {
                                         onTopContainerColor = it
                                         userSettings.setOnTopContainerColor(it)
-                                        update = true
+                                        updateColor = true
                                         showDialog = false
                                     }
                                 )
 
-                                if (update) {
+                                if (updateColor) {
                                     MaterialTheme.colorScheme.onTopContainer = onTopContainerColor
-                                    update = false
+                                    updateColor = false
                                 }
 
                                 Text("Top Bar Content Color", modifier = Modifier.weight(1f))
-                                Text("Change",
+                                Text(
+                                    "Change",
                                     color = if (userSettings.getOnTopContainerColor().isSpecified) {
                                         userSettings.getOnTopContainerColor()
                                     } else {
@@ -332,13 +315,14 @@ fun SettingsView(navController: NavController) {
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                             )
-                            // Button Color (MaterialTheme.colorScheme.button)
+
+                            // ----------- Button & Tab Color -----------
                             Row(
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
                                 var showDialog by remember { mutableStateOf(false) }
                                 var buttonColor by remember { mutableStateOf(userSettings.getButtonColor()) }
-                                var update by remember { mutableStateOf(false) }
+                                var updateColor by remember { mutableStateOf(false) }
 
                                 ColorPickerDialog(
                                     show = showDialog,
@@ -353,18 +337,19 @@ fun SettingsView(navController: NavController) {
                                     onPickedColor = {
                                         buttonColor = it
                                         userSettings.setButtonColor(it)
-                                        update = true
+                                        updateColor = true
                                         showDialog = false
                                     }
                                 )
 
-                                if (update) {
+                                if (updateColor) {
                                     MaterialTheme.colorScheme.button = buttonColor
-                                    update = false
+                                    updateColor = false
                                 }
 
                                 Text("Button and Tab Color", modifier = Modifier.weight(1f))
-                                Text("Change",
+                                Text(
+                                    "Change",
                                     color = MaterialTheme.colorScheme.button,
                                     modifier = Modifier.clickable {
                                         showDialog = true
@@ -375,8 +360,9 @@ fun SettingsView(navController: NavController) {
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                             )
+
+                            // ----------- Minimalistic Mode -----------
                             var minimalistic by remember { mutableStateOf(userSettings.getMinimalisticMode()) }
-                            // Minimalistic Mode (Switch)
                             Row(
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
@@ -415,7 +401,9 @@ fun SettingsView(navController: NavController) {
                                 Text("Minimalistic", modifier = Modifier.weight(1f))
                                 Switch(
                                     checked = minimalistic,
-                                    modifier = Modifier.size(44.dp, 24.dp).padding(end = 10.dp),
+                                    modifier = Modifier
+                                        .size(44.dp, 24.dp)
+                                        .padding(end = 10.dp),
                                     onCheckedChange = {
                                         minimalistic = it
                                         userSettings.setMinimalisticMode(it)
@@ -423,13 +411,9 @@ fun SettingsView(navController: NavController) {
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = MaterialTheme.colorScheme.button,
-                                        checkedTrackColor = MaterialTheme.colorScheme.button.copy(
-                                            alpha = 0.5f
-                                        ),
+                                        checkedTrackColor = MaterialTheme.colorScheme.button.copy(alpha = 0.5f),
                                         uncheckedThumbColor = MaterialTheme.colorScheme.button,
-                                        uncheckedTrackColor = MaterialTheme.colorScheme.button.copy(
-                                            alpha = 0f
-                                        )
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.button.copy(alpha = 0f)
                                     )
                                 )
                             }
@@ -437,7 +421,36 @@ fun SettingsView(navController: NavController) {
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
                             )
-                            // Reset to Default
+
+                            // ----------- Enable Vibration (default: off) -----------
+                            var enableVibration by remember { mutableStateOf(userSettings.getEnableVibration()) }
+                            Row(
+                                modifier = Modifier.padding(vertical = 10.dp)
+                            ) {
+                                Text("Enable Vibration", modifier = Modifier.weight(1f))
+                                Switch(
+                                    checked = enableVibration,
+                                    modifier = Modifier
+                                        .size(44.dp, 24.dp)
+                                        .padding(end = 10.dp),
+                                    onCheckedChange = { isChecked ->
+                                        enableVibration = isChecked
+                                        userSettings.setEnableVibration(isChecked)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MaterialTheme.colorScheme.button,
+                                        checkedTrackColor = MaterialTheme.colorScheme.button.copy(alpha = 0.5f),
+                                        uncheckedThumbColor = MaterialTheme.colorScheme.button,
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.button.copy(alpha = 0f)
+                                    )
+                                )
+                            }
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                            )
+
+                            // ----------- Reset to Default -----------
                             Row(
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
@@ -450,6 +463,7 @@ fun SettingsView(navController: NavController) {
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     MaterialTheme.colorScheme.button =
                                         MaterialTheme.colorScheme.primary
+
                                     val view = LocalView.current
                                     val colorScheme = MaterialTheme.colorScheme
                                     if (!view.isInEditMode) {
@@ -465,10 +479,12 @@ fun SettingsView(navController: NavController) {
                                 }
 
                                 Text("Reset to Default", modifier = Modifier.weight(1f))
-                                Text("Reset",
+                                Text(
+                                    "Reset",
                                     color = MaterialTheme.colorScheme.button,
                                     modifier = Modifier.clickable {
                                         userSettings.resetColors()
+                                        // also set minimalistic mode to default if desired
                                         userSettings.setMinimalisticMode(true)
                                         minimalistic = true
                                         reset = true
@@ -478,6 +494,7 @@ fun SettingsView(navController: NavController) {
                             }
                         }
                     }
+
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         "DEVELOPER",
@@ -502,10 +519,14 @@ fun SettingsView(navController: NavController) {
                                 modifier = Modifier.padding(vertical = 10.dp)
                             ) {
                                 Text("Version", modifier = Modifier.weight(1f))
-                                Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})${if (BuildConfig.DEBUG) " (DEBUG)" else ""}")
+                                Text(
+                                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})" +
+                                            if (BuildConfig.DEBUG) " (DEBUG)" else ""
+                                )
                             }
                         }
                     }
+
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         "DEVELOPED BY Skyler Clagg, Based on TEAMS ACE 229V AND JELLY 2733J VRC RoboScout",
@@ -515,11 +536,15 @@ fun SettingsView(navController: NavController) {
                     )
                 }
             }
+
             Spacer(modifier = Modifier.height(10.dp))
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp).clickable {
-                    uriHandler.openUri("https://discord.gg/KczJZUfs5f")
-                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp)
+                    .clickable {
+                        uriHandler.openUri("https://discord.gg/KczJZUfs5f")
+                    },
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(

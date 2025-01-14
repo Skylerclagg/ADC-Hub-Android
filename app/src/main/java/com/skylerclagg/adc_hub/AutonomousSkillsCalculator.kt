@@ -57,6 +57,10 @@ fun AutonomousFlightSkillsCalculator() {
     val isDarkTheme = isSystemInDarkTheme()
     val textColor = primaryTextColor()
 
+    // Retrieve user settings + vibration preference
+    val userSettings = UserSettings(LocalContext.current)
+    val enableVibration = userSettings.getEnableVibration()
+
     // State variables for task counts
     var takeOffCount by remember { mutableStateOf(0) }
     var identifyColorCount by remember { mutableStateOf(0) }
@@ -67,7 +71,7 @@ fun AutonomousFlightSkillsCalculator() {
     var keyholeCount by remember { mutableStateOf(0) }
     var selectedLandingOption by remember { mutableStateOf(LandingOption.NONE) }
 
-    // Calculating the total score based on the selected inputs
+    // Calculate the total score based on the selected inputs
     val totalScore = calculateTotalScore(
         takeOffCount, identifyColorCount, figure8Count,
         smallHoleCount, largeHoleCount, archGateCount, keyholeCount,
@@ -79,10 +83,19 @@ fun AutonomousFlightSkillsCalculator() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Autonomous Flight Calculator", color = textColor, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "Autonomous Flight Calculator",
+                        color = textColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 actions = {
                     IconButton(onClick = {
-                        triggerVibration(vibrator)
+                        // Only vibrate if user has vibration enabled
+                        if (enableVibration) {
+                            triggerVibration(vibrator)
+                        }
 
                         // Reset all inputs
                         takeOffCount = 0
@@ -114,7 +127,7 @@ fun AutonomousFlightSkillsCalculator() {
                     .padding(innerPadding)
                     .fillMaxSize()
                     .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp) // Reduced spacing
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Total Score Section
                 item {
@@ -138,7 +151,7 @@ fun AutonomousFlightSkillsCalculator() {
                     SectionHeader("Tasks:", textColor)
                 }
 
-                // Tasks card with black dividers and less padding
+                // Tasks card with black dividers
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -146,13 +159,14 @@ fun AutonomousFlightSkillsCalculator() {
                             containerColor = if (isDarkTheme) Color.DarkGray else Color.LightGray
                         )
                     ) {
-                        // No extra padding around the Column to reduce whitespace
                         Column {
                             AutoStyledStepper(
                                 "Take Off:",
                                 takeOffCount,
                                 maxValue = 2,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { takeOffCount = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -161,7 +175,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Identify Color Count:",
                                 identifyColorCount,
                                 maxValue = 2,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { identifyColorCount = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -170,7 +186,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Complete a Figure 8:",
                                 figure8Count,
                                 maxValue = 2,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { figure8Count = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -179,7 +197,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Fly Through Small Hole:",
                                 smallHoleCount,
                                 maxValue = 2,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { smallHoleCount = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -188,7 +208,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Fly Through Large Hole:",
                                 largeHoleCount,
                                 maxValue = 2,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { largeHoleCount = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -197,7 +219,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Fly Under Arch Gate:",
                                 archGateCount,
                                 maxValue = 4,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { archGateCount = it }
 
                             Divider(color = Color.Black, thickness = 1.dp)
@@ -206,7 +230,9 @@ fun AutonomousFlightSkillsCalculator() {
                                 "Fly Through Keyhole:",
                                 keyholeCount,
                                 maxValue = 4,
-                                labelColor = textColor
+                                labelColor = textColor,
+                                enableVibration = enableVibration,
+                                vibrator = vibrator
                             ) { keyholeCount = it }
                         }
                     }
@@ -218,7 +244,9 @@ fun AutonomousFlightSkillsCalculator() {
                         options = LandingOption.values().toList(),
                         selectedOption = selectedLandingOption,
                         onOptionChange = { selectedLandingOption = it },
-                        labelColor = textColor
+                        labelColor = textColor,
+                        enableVibration = enableVibration,
+                        vibrator = vibrator
                     )
                 }
             }
@@ -226,7 +254,7 @@ fun AutonomousFlightSkillsCalculator() {
     }
 }
 
-// Calculation logic unchanged
+// No changes here
 fun calculateTotalScore(
     takeOffCount: Int,
     identifyColorCount: Int,
@@ -249,17 +277,17 @@ fun calculateTotalScore(
     return score
 }
 
-// Reduced vertical padding from 12.dp to 8.dp inside stepper rows
+// Updated to accept enableVibration and vibrator parameters
 @Composable
 fun AutoStyledStepper(
     label: String,
     value: Int,
     maxValue: Int,
     labelColor: Color,
+    enableVibration: Boolean,
+    vibrator: android.os.Vibrator,
     onValueChange: (Int) -> Unit
 ) {
-    val vibrator = LocalContext.current.let { remember { it.getVibrator() } }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -271,7 +299,9 @@ fun AutoStyledStepper(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Button(
                 onClick = {
-                    triggerVibration(vibrator)
+                    if (enableVibration) {
+                        triggerVibration(vibrator)
+                    }
                     if (value > 0) onValueChange(value - 1)
                 },
                 modifier = Modifier.padding(2.dp),
@@ -289,7 +319,9 @@ fun AutoStyledStepper(
             )
             Button(
                 onClick = {
-                    triggerVibration(vibrator)
+                    if (enableVibration) {
+                        triggerVibration(vibrator)
+                    }
                     if (value < maxValue) onValueChange(value + 1)
                 },
                 modifier = Modifier.padding(2.dp),
@@ -301,6 +333,7 @@ fun AutoStyledStepper(
     }
 }
 
+// Updated to accept enableVibration and vibrator parameters
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StyledDropdownInput(
@@ -308,10 +341,11 @@ fun StyledDropdownInput(
     options: List<LandingOption>,
     selectedOption: LandingOption,
     onOptionChange: (LandingOption) -> Unit,
-    labelColor: Color
+    labelColor: Color,
+    enableVibration: Boolean,
+    vibrator: android.os.Vibrator
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val vibrator = LocalContext.current.let { remember { it.getVibrator() } }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -337,9 +371,17 @@ fun StyledDropdownInput(
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(option.displayName, color = primaryTextColor(), fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            option.displayName,
+                            color = primaryTextColor(),
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     onClick = {
-                        triggerVibration(vibrator)
+                        if (enableVibration) {
+                            triggerVibration(vibrator)
+                        }
                         onOptionChange(option)
                         expanded = false
                     }

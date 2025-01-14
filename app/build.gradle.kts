@@ -15,8 +15,8 @@ android {
         applicationId = "com.skylerclagg.adc_hub"
         minSdk = 30
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.0.2"
+        versionCode = 1
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
